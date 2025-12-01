@@ -4,7 +4,7 @@ import os
 # ----------------------------
 # Paths
 # ----------------------------
-RAW_PATH = "../mimic-iv-clinical-database-demo-2.2/hosp"  # adjust if needed
+RAW_PATH = "../mimic-iv-clinical-database-demo-2.2/hosp"  
 PROCESSED_PATH = "./data/processed/"
 OUTPUT_FILE = "processed_admissions_selected_labs.csv"
 
