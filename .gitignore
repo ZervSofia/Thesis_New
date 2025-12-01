@@ -1,0 +1,8 @@
+.venv/
+.vscode/
+__pychache__/
+temp/
+
+# wandb
+**/wandb/
+
