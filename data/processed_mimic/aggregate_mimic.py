@@ -4,8 +4,10 @@ import os
 # ----------------------------
 # Paths
 # ----------------------------
-RAW_PATH = "data/raw/mimic-iv-clinical-database-demo-2.2/hosp"  
-PROCESSED_PATH = "data/processed/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+RAW_PATH = "data/raw_mimic/mimic-iv-clinical-database-demo-2.2/hosp"  
+PROCESSED_PATH = os.path.join(BASE_DIR)
 OUTPUT_FILE = "processed_admissions_selected_labs.csv"
 
 # ----------------------------
