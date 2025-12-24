@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.stats import norm
 from numpy.linalg import pinv
-from ci_tests.base import CITest
+from causal_discovery.ci_tests.base import CITest
+
 
 class ListwiseCITest(CITest):
 
