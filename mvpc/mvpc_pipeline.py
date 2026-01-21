@@ -45,20 +45,7 @@ class MVPC:
         self.alpha = alpha
 
     def run(self, data):
-        """
-        Execute the full MVPC pipeline.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data matrix of shape (n_samples, n_variables) with missing values.
-
-        Returns
-        -------
-        graph : CausalGraph
-            The final oriented graph returned by causal-learn's PC algorithm.
-        """
-
+        
         n, p = data.shape
 
         # ---------------------------------------------------------
@@ -72,7 +59,7 @@ class MVPC:
         )
 
         # ---------------------------------------------------------
-        # Step 2a: Run standard PC to get initial skeleton
+        # Step 2a: Initial skeleton (undirected)
         # ---------------------------------------------------------
         pc_initial = pc(
             data,
@@ -80,26 +67,41 @@ class MVPC:
             alpha=self.alpha
         )
 
+        # Extract skeleton (symmetrize adjacency)
+        G_skel = pc_initial.G
+        G_skel = ((G_skel + G_skel.T) > 0).astype(int)
+
+        # Wrap in simple object for skeleton2
+        class SimpleSkeleton:
+            def __init__(self, G):
+                self.G = G
+
+        skel_pre = SimpleSkeleton(G_skel)
+
         # ---------------------------------------------------------
-        # Step 2b: Correct the skeleton using MVPC logic
+        # Step 2b: Corrected skeleton
         # ---------------------------------------------------------
         G_corrected, sepset_corrected, pmax_corrected = skeleton2(
             data=data,
             corr_test=self.corr_test,
             alpha=self.alpha,
-            skel_pre=pc_initial,
+            skel_pre=skel_pre,
             prt_m=prt_m
         )
 
         # ---------------------------------------------------------
-        # Step 2c: Run PC orientation on the corrected skeleton
+        # Step 2c: Orientation on corrected skeleton
         # ---------------------------------------------------------
-        # causal-learn does not allow injecting a custom skeleton directly,
-        # so we re-run PC but override the CI test with the corrected one.
-        graph_final = pc(
+        pc_obj = pc(
             data,
             ci_test=self.corr_test,
             alpha=self.alpha
         )
 
-        return graph_final
+        # Inject corrected skeleton
+        pc_obj.G = G_corrected
+
+        # Run only orientation rules
+        pc_obj.orient()
+
+        return pc_obj
