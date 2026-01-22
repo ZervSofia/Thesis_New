@@ -107,26 +107,22 @@ def _compute_weights_for_variable(data, target, prt_m):
     return weights
 
 
-def gauss_ci_drw(x, y, S, data, prt_m):
+def gauss_ci_drw(x, y, S, suffstat):
     """
     DRW-corrected Gaussian CI test.
 
-    Parameters
-    ----------
-    x, y : int
-        Variable indices.
-    S : list[int]
-        Conditioning set.
-    data : np.ndarray
-        Data matrix (n x p).
-    prt_m : dict
-        Missingness-parent structure.
-
-    Returns
-    -------
-    float
-        DRW-corrected p-value.
+    suffstat must contain:
+        - "data": np.ndarray (n x p)
+        - "prt_m": missingness-parent structure (optional but needed for DRW)
     """
+    data = suffstat["data"]
+    prt_m = suffstat.get("prt_m", None)
+
+    # If no missingness-parent info, fall back to unweighted test
+    if prt_m is None:
+        z = _gaussian_ci_stat_unweighted(x, y, S, data)
+        return 2 * (1 - norm.cdf(z))
+
     missing_inds = prt_m["m"]
 
     # If neither variable has missingness parents, use standard Gaussian CI
@@ -134,7 +130,6 @@ def gauss_ci_drw(x, y, S, data, prt_m):
         z = _gaussian_ci_stat_unweighted(x, y, S, data)
         return 2 * (1 - norm.cdf(z))
 
-    # Build combined weights if one or both have missingness
     n = data.shape[0]
     weights = np.ones(n)
 

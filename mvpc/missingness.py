@@ -96,7 +96,9 @@ def get_prt_R_ind(data, indep_test, alpha, R_ind):
             independent = False
 
             for S in combinations(nbrs, ord_size):
-                pval = indep_test(R_ind, y, S, data_mod)
+                suffstat = {"data": data_mod}
+                pval = indep_test(R_ind, y, S, suffstat)
+
 
                 if pval >= alpha:
                     # remove edge if independent

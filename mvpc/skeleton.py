@@ -87,7 +87,9 @@ def skeleton2(data, corr_test, alpha, skel_pre, prt_m):
             # Step 2 — Test all conditioning sets of size ord_size
             # ---------------------------------------------------------
             for S in combinations(neighbors, ord_size):
-                pval = corr_test(x, y, S, data, prt_m)
+                suffstat = {"data": data, "prt_m": prt_m}
+                pval = corr_test(x, y, S, suffstat)
+
 
                 # Track maximum p-value
                 pmax[x, y] = max(pmax[x, y], pval)
