@@ -87,7 +87,11 @@ def skeleton2(data, corr_test, alpha, skel_pre, prt_m):
             # Step 2 — Test all conditioning sets of size ord_size
             # ---------------------------------------------------------
             for S in combinations(neighbors, ord_size):
-                suffstat = {"data": data, "prt_m": prt_m}
+                suffstat = {
+                    "data": data,
+                    "prt_m": prt_m,
+                    "skel": skel_pre.G,  # needed for cond_PermC
+                }
                 pval = corr_test(x, y, S, suffstat)
 
 

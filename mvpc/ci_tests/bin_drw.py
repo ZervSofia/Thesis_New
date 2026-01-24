@@ -1,196 +1,150 @@
 """
 bin_drw.py
 
-Density Ratio Weighted CI test for binary variables (MVPC).
-
-Binary analogue of gauss_drw:
-    - Model missingness via logistic regression on parents.
-    - Use inverse-probability-like weights.
-    - Run a weighted logistic regression LRT for CI.
+Faithful Python translation of R's binCItest.drw.
+Implements the DRW (density ratio weighting) correction for binary CI tests.
 """
 
 import numpy as np
-from scipy.stats import chi2
-from sklearn.linear_model import LogisticRegression
+
+from ..utils.mvpc_utils import (
+    test_wise_deletion,
+    cond_PermC,
+    get_prt_m_xys,
+)
+
+from .bin_td import bin_ci_td
+from .gSquareBin import gSquareBin
+from ..utils.compute_weights_discrete import compute_weights_discrete
+# (We will create compute_weights_discrete.py next)
 
 
-def _logistic_lrt_stat_weighted(x, y, S, data, weights):
+# ---------------------------------------------------------
+# Weighted G² test (binary)
+# ---------------------------------------------------------
+def gSquareBin_weighted(x, y, S, data, weights):
     """
-    Weighted logistic regression likelihood-ratio statistic
-    for testing X ⟂ Y | S when Y is binary.
+    Weighted version of gSquareBin.
+    Faithful to R's gSquareBin.weighted.
     """
-    vars_idx = [x] + list(S)
-    y_idx = y
 
-    X_full = data[:, vars_idx]
-    y_bin = data[:, y_idx]
-    w = weights.copy()
+    idx = [x, y] + list(S)
+    sub = data[:, idx]
+    w = weights
 
-    # Drop rows with missing values
-    mask = ~np.isnan(X_full).any(axis=1) & ~np.isnan(y_bin)
-    X_full = X_full[mask]
-    y_bin = y_bin[mask]
-    w = w[mask]
+    # Ensure binary
+    if not np.all((sub == 0) | (sub == 1)):
+        raise ValueError("gSquareBin_weighted requires binary data (0/1).")
 
-    if X_full.shape[0] < 10 or len(np.unique(y_bin)) < 2:
-        return 0.0
+    n = sub.shape[0]
+    d = len(S)
+    n_configs = 2 ** d
 
-    # Reduced model: without X
-    if len(S) > 0:
-        X_reduced = X_full[:, 1:]
+    # Build contingency table
+    table = np.zeros((2, 2, n_configs))
+
+    if d > 0:
+        S_patterns = np.array(list(np.ndindex(*(2,) * d)))
     else:
-        X_reduced = np.zeros((X_full.shape[0], 1))
+        S_patterns = np.zeros((1, 0), dtype=int)
 
-    clf_full = LogisticRegression(max_iter=1000)
-    clf_reduced = LogisticRegression(max_iter=1000)
+    for k, pat in enumerate(S_patterns):
+        if d > 0:
+            mask = np.all(sub[:, 2:] == pat, axis=1)
+        else:
+            mask = np.ones(n, dtype=bool)
 
-    clf_full.fit(X_full, y_bin, sample_weight=w)
-    clf_reduced.fit(X_reduced, y_bin, sample_weight=w)
+        subset = sub[mask]
+        w_sub = w[mask]
 
-    prob_full = clf_full.predict_proba(X_full)[:, 1]
-    prob_reduced = clf_reduced.predict_proba(X_reduced)[:, 1]
+        if subset.shape[0] == 0:
+            continue
 
-    eps = 1e-9
-    prob_full = np.clip(prob_full, eps, 1 - eps)
-    prob_reduced = np.clip(prob_reduced, eps, 1 - eps)
+        for xv in [0, 1]:
+            for yv in [0, 1]:
+                table[xv, yv, k] = np.sum(w_sub[(subset[:, 0] == xv) & (subset[:, 1] == yv)])
 
-    ll_full = np.sum(
-        w * (y_bin * np.log(prob_full) + (1 - y_bin) * np.log(1 - prob_full))
-    )
-    ll_reduced = np.sum(
-        w * (y_bin * np.log(prob_reduced) + (1 - y_bin) * np.log(1 - prob_reduced))
-    )
+    # Compute G²
+    G2 = 0.0
+    for k in range(n_configs):
+        Nij = table[:, :, k]
+        Nk = np.sum(Nij)
 
-    lrt = 2 * (ll_full - ll_reduced)
-    return max(lrt, 0.0)
+        if Nk == 0:
+            continue
+
+        row_sums = np.sum(Nij, axis=1)
+        col_sums = np.sum(Nij, axis=0)
+
+        expected = np.outer(row_sums, col_sums) / Nk
+
+        mask = (Nij > 0) & (expected > 0)
+        G2 += 2 * np.sum(Nij[mask] * np.log(Nij[mask] / expected[mask]))
+
+    df = 2 ** d
+    from scipy.stats import chi2
+    return 1 - chi2.cdf(G2, df)
 
 
-def _logistic_lrt_stat_unweighted(x, y, S, data):
+# ---------------------------------------------------------
+# Main function: DRW-corrected binary CI test
+# ---------------------------------------------------------
+def bin_ci_drw(x, y, S, suffstat):
     """
-    Unweighted logistic regression LRT (fallback).
+    Faithful Python translation of R's binCItest.drw.
+
+    suffstat must contain:
+        - "data": full dataset
+        - "prt_m": missingness-parent structure
+        - "skel": initial skeleton (for cond_PermC)
     """
-    vars_idx = [x] + list(S)
-    y_idx = y
+    data = suffstat["data"]
 
-    X_full = data[:, vars_idx]
-    y_bin = data[:, y_idx]
+    # -----------------------------------------------------
+    # Step 1: Check if correction is needed
+    # -----------------------------------------------------
+    if not cond_PermC(x, y, S, suffstat):
+        return bin_ci_td(x, y, S, suffstat)
 
-    mask = ~np.isnan(X_full).any(axis=1) & ~np.isnan(y_bin)
-    X_full = X_full[mask]
-    y_bin = y_bin[mask]
+    # -----------------------------------------------------
+    # Step 2: Identify W = parents of missingness indicators
+    # -----------------------------------------------------
+    ind_test = [x, y] + list(S)
+    ind_W = list(set(get_prt_m_xys(ind_test, suffstat)))
 
-    if X_full.shape[0] < 10 or len(np.unique(y_bin)) < 2:
-        return 0.0
+    if len(ind_W) == 0:
+        return bin_ci_td(x, y, S, suffstat)
 
-    if len(S) > 0:
-        X_reduced = X_full[:, 1:]
-    else:
-        X_reduced = np.zeros((X_full.shape[0], 1))
+    # Recursively add parents of W
+    pa_W = list(set(get_prt_m_xys(ind_W, suffstat)))
+    candi_W = list(set(pa_W) - set(ind_W))
 
-    clf_full = LogisticRegression(max_iter=1000)
-    clf_reduced = LogisticRegression(max_iter=1000)
+    while len(candi_W) > 0:
+        ind_W = list(set(ind_W) | set(candi_W))
+        pa_W = list(set(get_prt_m_xys(ind_W, suffstat)))
+        candi_W = list(set(pa_W) - set(ind_W))
 
-    clf_full.fit(X_full, y_bin)
-    clf_reduced.fit(X_reduced, y_bin)
+    ind_W = list(set(ind_W))
 
-    prob_full = clf_full.predict_proba(X_full)[:, 1]
-    prob_reduced = clf_reduced.predict_proba(X_reduced)[:, 1]
+    # -----------------------------------------------------
+    # Step 3: Compute DRW weights (discrete version)
+    # -----------------------------------------------------
+    corr_ind = ind_test + ind_W
+    weights = compute_weights_discrete(corr_ind, suffstat)
 
-    eps = 1e-9
-    prob_full = np.clip(prob_full, eps, 1 - eps)
-    prob_reduced = np.clip(prob_reduced, eps, 1 - eps)
+    # -----------------------------------------------------
+    # Step 4: Test-wise deletion
+    # -----------------------------------------------------
+    # Step 4: Test-wise deletion
+    data_tw = test_wise_deletion(corr_ind, data)
 
-    ll_full = np.sum(
-        y_bin * np.log(prob_full) + (1 - y_bin) * np.log(1 - prob_full)
-    )
-    ll_reduced = np.sum(
-        y_bin * np.log(prob_reduced) + (1 - y_bin) * np.log(1 - prob_reduced)
-    )
-
-    lrt = 2 * (ll_full - ll_reduced)
-    return max(lrt, 0.0)
-
-
-def _compute_weights_for_variable(data, target, prt_m):
-    """
-    Compute DRW weights for a variable with missingness (binary case).
-    """
-    n, p = data.shape
-    m_indicator = np.isnan(data[:, target]).astype(int)
-
-    parents = prt_m["prt"].get(target, [])
-    if len(parents) == 0:
-        return np.ones(n)
-
-    Z = data[:, parents]
-    mask = ~np.isnan(Z).any(axis=1)
-    Z_obs = Z[mask]
-    R_obs = m_indicator[mask]
-
-    if Z_obs.shape[0] < 10 or len(np.unique(R_obs)) < 2:
-        return np.ones(n)
-
-    clf = LogisticRegression(max_iter=1000)
-    clf.fit(Z_obs, R_obs)
-    prob = clf.predict_proba(Z_obs)[:, 1]
-
-    eps = 1e-6
-    prob = np.clip(prob, eps, 1 - eps)
-
-    w_obs = 1.0 / (1.0 - prob)
-    weights = np.ones(n)
-    weights[mask] = w_obs
-
-    return weights
+    # weights already correspond to the deleted rows
+    weights_tw = weights
 
 
-def bin_ci_drw(x, y, S, data, prt_m):
-    """
-    DRW-corrected CI test for binary variables.
-
-    Parameters
-    ----------
-    x, y : int
-        Variable indices.
-    S : list[int]
-        Conditioning set.
-    data : np.ndarray
-        Data matrix (n x p).
-    prt_m : dict
-        Missingness-parent structure.
-
-    Returns
-    -------
-    float
-        DRW-corrected p-value.
-    """
-    # Ensure y is binary response; swap if needed
-    y_vals = data[:, y]
-    if len(np.unique(y_vals[~np.isnan(y_vals)])) != 2:
-        x, y = y, x
-        y_vals = data[:, y]
-
-    missing_inds = prt_m["m"]
-
-    # No missingness parents → standard LRT
-    if x not in missing_inds and y not in missing_inds:
-        stat = _logistic_lrt_stat_unweighted(x, y, S, data)
-        df = 1
-        return 1 - chi2.cdf(stat, df=df)
-
-    # Build combined weights
-    n = data.shape[0]
-    weights = np.ones(n)
-
-    if x in missing_inds:
-        w_x = _compute_weights_for_variable(data, x, prt_m)
-        weights *= w_x
-
-    if y in missing_inds:
-        w_y = _compute_weights_for_variable(data, y, prt_m)
-        weights *= w_y
-
-    stat = _logistic_lrt_stat_weighted(x, y, S, data, weights)
-    df = 1
-    p = 1 - chi2.cdf(stat, df=df)
-    return p
+    # -----------------------------------------------------
+    # Step 5: Weighted G² test
+    # -----------------------------------------------------
+    # In data_tw, x,y,S correspond to indices 0,1,2,...
+    S_local = list(range(2, 2 + len(S)))
+    return gSquareBin_weighted(0, 1, S_local, data_tw[:, corr_ind], weights_tw)
