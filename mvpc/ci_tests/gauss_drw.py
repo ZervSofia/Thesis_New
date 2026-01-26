@@ -81,7 +81,7 @@ def gauss_ci_drw(x, y, S, suffstat):
         - "skel": initial skeleton (for cond_PermC)
     """
     data = suffstat["data"]
-
+    
     # -----------------------------------------------------
     # Step 1: Check if correction is needed
     # -----------------------------------------------------

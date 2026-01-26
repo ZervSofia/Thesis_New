@@ -60,9 +60,9 @@ def skeleton2(data, corr_test, alpha, skel_pre, prt_m):
     # Step 1 — PC-style iterative search over conditioning set sizes
     # ---------------------------------------------------------
     ord_size = 0
-    done = False
+    
 
-    while not done:
+    while True:
         done = True
 
         # List all current edges
@@ -90,7 +90,7 @@ def skeleton2(data, corr_test, alpha, skel_pre, prt_m):
                 suffstat = {
                     "data": data,
                     "prt_m": prt_m,
-                    "skel": skel_pre.G,  # needed for cond_PermC
+                    "skel": G,
                 }
                 pval = corr_test(x, y, S, suffstat)
 
