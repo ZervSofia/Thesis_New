@@ -1,8 +1,8 @@
 """
 bin_permc.py
 
-Faithful Python translation of R's binCItest.permc.
-Implements the PermC correction for binary conditional independence tests.
+translation of binCItest.permc.
+PermC correction for binary CI tests.
 """
 
 import numpy as np
@@ -15,22 +15,18 @@ from ..utils.mvpc_utils import (
     perm,
 )
 
-from .bin_td import bin_ci_td      # your deletion-based binary CI test
-from .gSquareBin import gSquareBin # your unweighted G² test
+from .bin_td import bin_ci_td      
+from .gSquareBin import gSquareBin # unweighted G^2 test
 
 
-# ---------------------------------------------------------
-# Helper: generate all binary combinations of length k
-# (R: bincombinations)
-# ---------------------------------------------------------
+
+# generate all binary combinations
 def binary_combinations(k):
     return np.array(list(product([0, 1], repeat=k)), dtype=int)
 
 
-# ---------------------------------------------------------
-# Helper: estimate multivariate Bernoulli distribution
-# (R: ObtainMultBinaryDist)
-# ---------------------------------------------------------
+
+# estimate multivariate Bernoulli distr
 def estimate_mult_binary_dist(data):
     """
     Estimate joint distribution of multivariate binary vector.
@@ -50,10 +46,7 @@ def estimate_mult_binary_dist(data):
     return p, patterns
 
 
-# ---------------------------------------------------------
-# Helper: sample from multivariate Bernoulli distribution
-# (R: RMultBinary)
-# ---------------------------------------------------------
+
 def sample_mult_binary(n, p, patterns):
     """
     Sample n rows from a multivariate Bernoulli distribution.
@@ -62,12 +55,12 @@ def sample_mult_binary(n, p, patterns):
     return patterns[idx]
 
 
-# ---------------------------------------------------------
-# Main function: PermC for binary CI test
-# ---------------------------------------------------------
+
+# PermC for binary CI test
+
 def bin_ci_permc(x, y, S, suffstat):
     """
-    Faithful Python translation of R's binCItest.permc.
+    binCItest.permc.
 
     suffstat must contain:
         - "data": full dataset
@@ -76,15 +69,12 @@ def bin_ci_permc(x, y, S, suffstat):
     """
     data = suffstat["data"]
 
-    # -----------------------------------------------------
-    # Step 1: Check if correction is needed
-    # -----------------------------------------------------
+    # Check if correction is needed
     if not cond_PermC(x, y, S, suffstat):
         return bin_ci_td(x, y, S, suffstat)
 
-    # -----------------------------------------------------
-    # Step 2: Identify W = parents of missingness indicators
-    # -----------------------------------------------------
+    
+    # Identify W = parents of missingness indicators
     ind_test = [x, y] + list(S)
     ind_W = list(set(get_prt_m_xys(ind_test, suffstat)))
 
@@ -102,14 +92,12 @@ def bin_ci_permc(x, y, S, suffstat):
 
     ind_W = list(set(ind_W))
 
-    # -----------------------------------------------------
-    # Step 3: Build index set for PermC
-    # -----------------------------------------------------
+    
+    # Build index set for PermC
     ind_permc = ind_test + ind_W
 
-    # -----------------------------------------------------
-    # Step 4: Test-wise deletion
-    # -----------------------------------------------------
+
+    # Test-wise deletion
     data_tw = test_wise_deletion(ind_permc, data)
     data_tw = data_tw[:, ind_permc]
 
@@ -117,9 +105,8 @@ def bin_ci_permc(x, y, S, suffstat):
     d_test = len(ind_test)
     d_W = len(ind_W)
 
-    # -----------------------------------------------------
-    # Step 5: Estimate CPDs for each W pattern
-    # -----------------------------------------------------
+ 
+    # Estimate CPDs for each W pattern
     W_patterns = binary_combinations(d_W)
     n_patterns = len(W_patterns)
 
@@ -138,9 +125,8 @@ def bin_ci_permc(x, y, S, suffstat):
 
         joint_dists.append((p, patterns))
 
-    # -----------------------------------------------------
-    # Step 6: Shuffle W (R: perm)
-    # -----------------------------------------------------
+
+    # Shuffle W 
     data_W_perm = perm(ind_W, data)
     data_W_perm = np.asarray(data_W_perm)
 
@@ -150,9 +136,8 @@ def bin_ci_permc(x, y, S, suffstat):
     else:
         W_perm = data_W_perm[:n_tw, :]
 
-    # -----------------------------------------------------
-    # Step 7: Generate virtual data
-    # -----------------------------------------------------
+
+    # Generate virtual data
     virtual_rows = []
 
     for i, pat in enumerate(W_patterns):
@@ -171,10 +156,8 @@ def bin_ci_permc(x, y, S, suffstat):
 
     data_vir = np.vstack(virtual_rows)
 
-    # -----------------------------------------------------
-    # Step 8: Run standard binary CI test on virtual data
-    # -----------------------------------------------------
-    # In virtual data: col 0 = x, col 1 = y, col 2.. = S
+
+    # standard binary CI test on virtual data
     if len(ind_test) > 2:
         S_local = list(range(2, len(ind_test)))
     else:

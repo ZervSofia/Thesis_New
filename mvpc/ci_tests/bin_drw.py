@@ -1,8 +1,8 @@
 """
 bin_drw.py
 
-Faithful Python translation of R's binCItest.drw.
-Implements the DRW (density ratio weighting) correction for binary CI tests.
+translation of binCItest.drw.
+DRW correction for binary CI tests.
 """
 
 import numpy as np
@@ -16,16 +16,13 @@ from ..utils.mvpc_utils import (
 from .bin_td import bin_ci_td
 from .gSquareBin import gSquareBin
 from ..utils.compute_weights_discrete import compute_weights_discrete
-# (We will create compute_weights_discrete.py next)
 
 
-# ---------------------------------------------------------
-# Weighted G² test (binary)
-# ---------------------------------------------------------
+# Weighted G^2 test (binary)
 def gSquareBin_weighted(x, y, S, data, weights):
     """
     Weighted version of gSquareBin.
-    Faithful to R's gSquareBin.weighted.
+    from gSquareBin.weighted.
     """
 
     idx = [x, y] + list(S)
@@ -34,7 +31,7 @@ def gSquareBin_weighted(x, y, S, data, weights):
 
     # Ensure binary
     if not np.all((sub == 0) | (sub == 1)):
-        raise ValueError("gSquareBin_weighted requires binary data (0/1).")
+        raise ValueError("gSquareBin_weighted requires binary data")
 
     n = sub.shape[0]
     d = len(S)
@@ -64,7 +61,7 @@ def gSquareBin_weighted(x, y, S, data, weights):
             for yv in [0, 1]:
                 table[xv, yv, k] = np.sum(w_sub[(subset[:, 0] == xv) & (subset[:, 1] == yv)])
 
-    # Compute G²
+    # Compute G^2
     G2 = 0.0
     for k in range(n_configs):
         Nij = table[:, :, k]
@@ -86,12 +83,10 @@ def gSquareBin_weighted(x, y, S, data, weights):
     return 1 - chi2.cdf(G2, df)
 
 
-# ---------------------------------------------------------
-# Main function: DRW-corrected binary CI test
-# ---------------------------------------------------------
+# DRW-corrected binary CI test
 def bin_ci_drw(x, y, S, suffstat):
     """
-    Faithful Python translation of R's binCItest.drw.
+    binCItest.drw.
 
     suffstat must contain:
         - "data": full dataset
@@ -100,15 +95,13 @@ def bin_ci_drw(x, y, S, suffstat):
     """
     data = suffstat["data"]
 
-    # -----------------------------------------------------
-    # Step 1: Check if correction is needed
-    # -----------------------------------------------------
+
+    # Check if correction is needed
     if not cond_PermC(x, y, S, suffstat):
         return bin_ci_td(x, y, S, suffstat)
 
-    # -----------------------------------------------------
-    # Step 2: Identify W = parents of missingness indicators
-    # -----------------------------------------------------
+    
+    # Identify W = parents of missingness indicators
     ind_test = [x, y] + list(S)
     ind_W = list(set(get_prt_m_xys(ind_test, suffstat)))
 
@@ -126,25 +119,17 @@ def bin_ci_drw(x, y, S, suffstat):
 
     ind_W = list(set(ind_W))
 
-    # -----------------------------------------------------
-    # Step 3: Compute DRW weights (discrete version)
-    # -----------------------------------------------------
+
+    # Compute DRW weights (discrete)
     corr_ind = ind_test + ind_W
     weights = compute_weights_discrete(corr_ind, suffstat)
 
-    # -----------------------------------------------------
-    # Step 4: Test-wise deletion
-    # -----------------------------------------------------
-    # Step 4: Test-wise deletion
-    data_tw = test_wise_deletion(corr_ind, data)
 
-    # weights already correspond to the deleted rows
+    # Test-wise deletion
+    data_tw = test_wise_deletion(corr_ind, data)
     weights_tw = weights
 
 
-    # -----------------------------------------------------
-    # Step 5: Weighted G² test
-    # -----------------------------------------------------
-    # In data_tw, x,y,S correspond to indices 0,1,2,...
+    # Weighted G^2 test
     S_local = list(range(2, 2 + len(S)))
     return gSquareBin_weighted(0, 1, S_local, data_tw[:, corr_ind], weights_tw)
