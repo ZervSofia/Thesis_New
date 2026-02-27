@@ -1,10 +1,8 @@
 """
-mvpc_oracle.py
-
-A thin wrapper around MVPC that allows overriding the missingness-parent
+thin wrapper around MVPC that allows overriding the missingness-parent
 structure (prt_m) with oracle information from synthetic experiments.
 
-This leaves the original MVPC implementation untouched.
+
 """
 
 import numpy as np
@@ -20,7 +18,7 @@ class MVPC_Oracle:
 
     def run(self, data, prt_m):
         """
-        Run MVPC using *oracle* missingness-parent structure.
+        Run MVPC using oracle missingness-parent structure.
 
         Parameters
         ----------
@@ -32,7 +30,7 @@ class MVPC_Oracle:
         """
         n, p = data.shape
 
-        # Step 2a: initial skeleton (same as MVPC)
+        # initial skeleton 
         G_initial, sepset_initial = _pc_skeleton_initial(
             data=data,
             indep_test=self.indep_test,
@@ -45,7 +43,7 @@ class MVPC_Oracle:
 
         skel_pre = SimpleSkeleton(G_initial)
 
-        # Step 2b: corrected skeleton using oracle prt_m
+        # corrected skeleton using oracle prt_m
         G_corrected, sepset_corrected, pmax_corrected = skeleton2(
             data=data,
             corr_test=self.corr_test,

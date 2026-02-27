@@ -1,14 +1,12 @@
 
 
 """
-missingness.py
-
-Implements:
+We Implement:
     - get_m_ind: detect which variables contain missing values
     - get_prt_R_ind: identify parents of each missingness indicator
     - detection_prt_m: orchestrate missingness-parent detection
 
-This module corresponds to MVPC Step 1.
+This module corresponds to the first step of MVPC.
 """
 
 import numpy as np
@@ -64,15 +62,15 @@ def get_prt_R_ind(data, indep_test, alpha, R_ind):
     """
     n, p = data.shape
 
-    # 1) Create missingness indicator and replace column
+    # Create missingness indicator and replace column
     data_mod = data.copy()
     data_mod[:, R_ind] = np.isnan(data[:, R_ind]).astype(int)
 
-    # 2) Initialize fully connected undirected graph (no self-loops)
+    # Initialize fully connected undirected graph (no self-loops)
     G = np.ones((p, p), dtype=bool)
     np.fill_diagonal(G, False)
 
-    # 3) PC-style loop over conditioning set size
+    # PC-style loop over conditioning set size
     ord_size = 0
     done = False
 
@@ -116,67 +114,6 @@ def get_prt_R_ind(data, indep_test, alpha, R_ind):
     # Parents = variables still adjacent to R_ind
     parents = list(np.where(G[R_ind])[0])
     return parents
-
-
-# def detection_prt_m(data, indep_test, alpha, p):
-#     """
-#     Detect parents of all missingness indicators.
-
-#     Parameters
-#     ----------
-#     data : np.ndarray
-#         Data matrix (n x p).
-#     indep_test : callable
-#         Base CI test used for missingness-parent detection.
-#     alpha : float
-#         Significance threshold.
-#     p : int
-#         Number of variables.
-
-#     Returns
-#     -------
-#     dict
-#         {
-#             'm': list of missingness indicator indices (with at least one parent),
-#             'prt': {R_ind: [parent indices]}
-#         }
-#     """
-#     m_inds = get_m_ind(data)
-#     prt = {}
-
-#     for R_ind in tqdm(m_inds, desc="Detecting parents of missingness indicators"):
-#         parents = get_prt_R_ind(data, indep_test, alpha, R_ind)
-#         if parents:  # only keep indicators that actually have parents
-#             prt[R_ind] = parents
-
-#     # Keep only missingness indicators that have at least one parent
-#     m_inds_filtered = [m for m in m_inds if m in prt]
-
-#     return {"m": m_inds_filtered, "prt": prt}
-
-
-
-
-# def detection_prt_m(data, indep_test, alpha, p):
-    
-#     m_inds = get_m_ind(data)
-
-#     # persistent modified data (like R)
-#     data_mod = data.copy()
-#     prt = {}
-
-#     for R_ind in m_inds:
-#         # permanently binarize this column
-#         data_mod[:, R_ind] = np.isnan(data[:, R_ind]).astype(int)
-
-#         parents = get_prt_R_ind(data_mod, indep_test, alpha, R_ind)
-#         if parents:
-#             prt[R_ind] = parents
-
-#     m_inds_filtered = [m for m in m_inds if m in prt]
-
-#     return {"m": m_inds_filtered, "prt": prt}
-
 
 
 def detection_prt_m(data, indep_test, alpha, p):
