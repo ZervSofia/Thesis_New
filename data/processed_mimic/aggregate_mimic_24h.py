@@ -1,8 +1,6 @@
 import os
 import pandas as pd
 
-
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 RAW_HOSP_PATH = os.path.join(
