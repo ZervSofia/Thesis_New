@@ -5,8 +5,8 @@ from scipy.stats import chi2
 
 def gSquareBin(x, y, S, data):
     """
-    Unweighted G² test for binary variables.
-    Faithful to R's gSquareBin (unweighted version).
+    Unweighted G^2 test for binary variables.
+    faithful gSquareBin unweighted 
 
     Parameters
     ----------
@@ -20,7 +20,7 @@ def gSquareBin(x, y, S, data):
     Returns
     -------
     float
-        p-value of the G² test.
+        p-value of the G^2 test.
     """
     # Extract relevant columns
     idx = [x, y] + list(S)
@@ -37,7 +37,6 @@ def gSquareBin(x, y, S, data):
     n_configs = 2 ** d
 
     # Build contingency table
-    # Dimensions: 2 x 2 x (2^|S|)
     table = np.zeros((2, 2, n_configs))
 
     # Enumerate all S patterns
@@ -57,12 +56,12 @@ def gSquareBin(x, y, S, data):
         if subset.shape[0] == 0:
             continue
 
-        # Count occurrences of x,y
+        # occurrences of x,y
         for xv in [0, 1]:
             for yv in [0, 1]:
                 table[xv, yv, i] = np.sum((subset[:, 0] == xv) & (subset[:, 1] == yv))
 
-    # Compute expected counts
+    # expected counts
     G2 = 0.0
     for k in range(n_configs):
         Nij = table[:, :, k]
@@ -76,7 +75,7 @@ def gSquareBin(x, y, S, data):
 
         expected = np.outer(row_sums, col_sums) / Nk
 
-        # Avoid log(0)
+        
         mask = (Nij > 0) & (expected > 0)
         G2 += 2 * np.sum(Nij[mask] * np.log(Nij[mask] / expected[mask]))
 
