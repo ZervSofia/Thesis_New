@@ -62,11 +62,15 @@ def create_mar_ind(colliders,
     left_ind_m = list(set(range(num_var)) - set(ms) - set(prt_ms))
     np.random.shuffle(left_ind_m)
 
-    for i in range(end_for):
+    # for i in range(end_for):
+    #     ms.append(left_ind_m[i])
+
+    # return ms, prt_ms
+    
+    for i in range(min(end_for, len(left_ind_m))):
         ms.append(left_ind_m[i])
 
     return ms, prt_ms
-
 
 
 # Generate MAR missing values
